@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html>
+    
+<head>
+<meta charset="utf-8" />
+<title>Constellation Explorer : an astronomy game written in HTML5! </title>
+
+<style type="text/css">
+body {
+    background-color: #000000;        
+    font-family: verdana;
+    font-size: 12px;
+}
+
+div.infowindow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border: 1px solid white;
+    color: white;
+    background-color: black;
+    visibility: hidden;
+    padding: 5px 5px 5px 5px;
+    filter:alpha(opacity=80);
+    opacity:0.8;
+    -moz-opacity:0.8;
+}
+
+span.redbold {
+    color: red;
+    font-weight: bold;
+}
+
+span.greenbold {
+    color: green;
+    font-weight: bold;
+}
+
+p.close {
+    color: red;
+}
+
+p.close:hover {
+    color: red;
+    font-weight: bold;
+}
+
+div.fbox {
+    border: 1px solid white;
+    width: 75;
+    height: 150;
+    position: absolute;
+    top: 0;
+    left: 100px;
+    resize: both;
+    overflow: auto;
+    color: white;
+    background-color: black;
+    visibility: hidden;
+    padding: 5px 5px 5px 5px;
+}
+
+div.fbox2 {
+    border: 1px solid white;
+    width: 200px;
+    height: 350px;
+    position: absolute;
+    top: 0;
+    left: 200px;
+    overflow: scroll;
+    color: white;
+    background-color: black;
+    visibility: hidden;
+    resize: both;
+    padding: 5px 5px 5px 5px;
+}
+
+div.gamebox {
+    border: 1px solid white;
+    position: absolute;
+    width: 500px;
+    height: 50px;
+    top: 0;
+    right: 50px;
+    resize: both;
+    overflow: auto;
+    color: white;
+    background-color: black;
+    visibility: hidden;
+    padding: 5px 5px 5px 5px;
+}
+
+div.fadeout {
+    position: absolute;
+    top: 40%;
+    left: 40%;
+    color: white;
+    background-color: black;
+    padding: 10;
+    font-family: verdana;
+    font-size: 20px;
+    visibility: visible;
+    text-align: center;
+    padding: 5px 5px 5px 5px;
+}
+</style>
+
+<script src="js/Three.js"></script>
+
+<script>
+var camera, scene, renderer;
+var geometry, material, mesh;
+var projector;
+var selection_objects = [];
+
+var constellationXHR = new XMLHttpRequest();
+var parsedJSON;
+var camera_azimuth = 0.0;
+var camera_incl = 0.0;
+var dome_radius = 6000.0;
+var star_radius = dome_radius * 0.8;
+var camera_radius = 200;
+var const_array = [];
+var game_mode = 0;
+var game_index = 0;
+
+var mouse_x = 0;
+var mouse_y = 0;
+var scrollTop = 0;
+var bInfoWindowIsVisible = 0;
+var fboxvisible = 0;
+var lastfbox = "";
+
+var constellation_list = ["Andromeda", "Cygnus", "Ursa Major", "Orion", "Lyra", 
+                          "Cassiopeia", "Aquila", "Scorpio", "Libra", "Gemini",
+                          "Leo", "Perseus", "Virgo", "Hercules", "Coma Berenices", 
+                          "Canes Venatici", "Crater", "Canis Minor", "Caelum", "Chamaeleon",
+                          "Cancer", "Sculptor", "Ara", "Cetus", "Aries", 
+                          "Pyxis", "Bootes", "Capricornus", "Cepheus", "Auriga", 
+                          "Columba", "Circinus", "Corona Australis", "Corona Borealis", "Corvus",
+                          "Crux", "Delphinus", "Draco", "Norma", "Sagitta", 
+                          "Fornax", "Canis Major", "Grus", "Horologium", "Hydra",
+                          "Hydrus", "Indus", "Lacerta", "Monoceros", "Lepus", 
+                          "Lupus", "Antlia", "Microscopium", "Musca", "Octans", 
+                          "Apus", "Ophiuchus", "Pavo", "Pegasus", "Pictor", 
+                          "Equuleus", "Leo Minor", "Vulpecula", "Ursa Minor", "Phoenix",
+                          "Pisces", "Piscis Austrinus", "Volans", "Reticulum", "Sagittarius", 
+                          "Serpens", "Sextans", "Mensa", "Taurus", "Telescopium", 
+                          "Tucana", "Triangulum", "Triangulum Australe", "Aquarius", "Scutum",
+                          "Carina", "Centaurus", "Dorado", "Eridanus", "Lynx",
+                          "Puppis", "Vela", "Camelopardalis", 
+                         ];
+
+var constellationInfo = { 
+    "Andromeda" : "Named for Andromeda, daughter of Cassiopeia, in Greek mythology, <br/> this is one of the 48 constellations listed by Ptolemy", 
+    "Cygnus" : "One of the most recognizable constellations of the northern summer and autumn, <br/>it is the Greek word for <i>swan</i>",
+    "Ursa Major" : "The Great Bear, also known as The Big Dipper, is a constellation <br/> visible throughout the year in the northern hemisphere",
+    "Orion" : "Orion, The Hunter, is located on the celestial <br/> equator and is visible throughout the world",
+    "Lyra" : "Latin for <i>Lyre</i>, its principal star, Vega, <br/> is one of the brightest stars in the sky",
+    "Cassiopeia" : "Cassiopeia is a constellation in the northern sky, <br/> named after the vain Queen by the same name",
+    "Aquila" : "Its name is Latin for <i>eagle</i> and it is best seen in the <br/> summer as it is located along the Milky Way",
+    "Scorpio" : "One of the constellations of the zodiac, it is <br/> located in the southern hemisphere near the center of the Milky Way",
+    "Libra" : "One of the constellations of the zodiac, <br/> it is faint with no first magnitude stars",
+    "Gemini" : "One of the constellations of the zodiac, <br/> its name is Latin for <i>twins</i>",
+    "Leo" : "One of the constellations of the zodiac, <br/> its name is Latin for <i>lion</i>",
+    "Perseus" : "Perseus is a constellation in the northern sky, <br/> named after the Greek hero by the same name",
+    "Virgo" : "One of the constellations of the zodiac, <br/> its name is Latin for <i>virgin</i>",
+    "Hercules" : "Hercules, named after the Roman hero, <br/> is the fifth largest of the modern constellations",
+    "Coma Berenices" : "Located near Leo, its name means <i>Berenice's Hair</i>",
+    "Canes Venatici" : "Its name is Latin for <i>hunting dogs</i> and is <br/> often depicted in illustrations as representing the dogs of Bootes the Herdsman",
+    "Crater" : "Its name is Latin for <i>cup</i> and in Greek <br/> mythology it is identified with the cup of Apollo",
+    "Canis Minor" : "A small constellation in the northern celestial hemisphere, <br/> its name is Latin for <i>smaller dog</i> and is commonly represented <br/> as following the constellation of Orion the hunter",
+    "Caelum" : "A faint constellation seen in the <br/> southern sky, its name means the <i>chisel</i>",
+    "Chamaeleon" : "A small constellation in the southern <br/> sky, it is named after the chameleon",
+    "Cancer" : "One of the constellations of the zodiac, <br/> its name is Latin for <i>crab</i>",
+    "Sculptor" : "A small and faint constellation in the <br/> southern sky, it represents a sculptor",
+    "Ara" : "A southern constellation situated between Scorpius and <br/> Triangulum Australe, its name is Latin for <i>altar</i>",
+    "Cetus" : "Its name refers to Cetus, a sea monster in Greek <br/> mythology, although it is often called the whale",
+    "Aries" : "One of the constellations of the zodiac, <br/> its name is Latin for <i>ram</i>",
+    "Pyxis" : "A small and faint constellation in the southern sky, <br/> its name is Latin for a <i>mariner's compass</i>",
+    "Bootes" : "A constellation in the northern sky, the name comes from <i>herdsman</i> in Greek",
+    "Capricornus" : "It is often called Capricorn when referring to the corresponding <br/> astrological sign. Its name is Latin for <i>goat horn</i>",
+    "Cepheus" : "A constellation in the northern sky, it is named after <br/> Cepheus, King of Aethiopia in Greek mythology",
+    "Auriga" : "Its name is the Latin word for <i>charioteer</i>",
+    "Columba" : "Its name is Latin for <i>dove</i>",
+    "Circinus" : "A small and faint constellation in the southern <br/> sky its name is Latin for <i>compass</i>",
+    "Corona Australis" : "A constellation in the southern hemisphere, <br/> its name is Latin for <i>southern crown</i>",
+    "Corona Borealis" : "A constellation in the northern hemisphere, <br/> its name is Latin for <i>northern crown</i>",
+    "Corvus" : "A small constellation in the southern sky, <br/> its name is Latin for <i>crow</i> or <i>raven</i>",
+    "Crux" : "Crux is one of the most distinctive of the 88 modern <br/> constellations and its name is Latin for <i>cross</i>",
+    "Delphinus" : "A constellation in the northern sky, <br/> its name is Latin for <i>dolphin</i>",
+    "Draco" : "A constellation in the far northern sky, <br/> its name is Latin for <i>dragon</i>",
+    "Norma" : "A small constellation in the southern sky, its name is <br/> Latin for <i>normal</i>, referring to a right angle",
+    "Sagitta" : "Sagitta is Latin for <i>arrow</i>, and can be seen from every <br/> location on Earth except within the Arctic circle",
+    "Fornax" : "A constellation in the southern sky, <br/> its name is Latin for <i>furnace</i>",
+    "Canis Major" : "Its name is Latin for <i>greater dog</i> and is commonly represented <br/> as one of the dogs following Orion the hunter. This constellation contains Sirius, the brightest star in the sky",
+    "Grus" : "A constellation in the southern sky, <br/> its name is Latin for the <i>crane</i>",
+    "Horologium" : "A small and faint constellation in the southern <br/> sky, its name is Latin for <i>clock</i>",
+    "Hydra" : "A constellation commonly represented as a water snake",
+    "Hydrus" : "A small constellation in the southern sky, <br/> its name means <i>male water snake</i>",
+    "Indus" : "A constellation in the southern sky",
+    "Lacerta" : "A small faint constellation, its name is Latin for <i>lizard</i>",
+    "Monoceros" : "A faint constellation on the celestial <br/> equator, its name is Greek for <i>unicorn</i>",
+    "Lepus" : "A constellation lying just south of the <br/> celestial equator, its name is Latin for <i>hare</i>",
+    "Lupus" : "A constellation in the southern sky, <br/> its name is Latin for <i>wolf</i>",
+    "Antlia" : "A constellation in the southern sky its name means <i>pump</i>",
+    "Microscopium" : "A small constellation in the southern sky, its name is Latin for <i>microscope</i>",
+    "Musca" : "One of the minor southern constellations",
+    "Octans" : "A faint constellation in the southern sky, <br/> its name is Latin for the eigth part of a circle",
+    "Apus" : "A faint constellation in the southern sky, <br/> its name means no feet in Greek",
+    "Ophiuchus" : "A large constellation located around the celestial equator, <br/> its name is from the Greek work for serpent bearer, and is commonly represented <br/> as a man grasping the snake that is represented by the constellation Sepens",
+    "Pavo" : "A constellation of the southern sky, <br/> its name is Latin for <i>peacock</i>",
+    "Pegasus" : "A constellation of the northern sky, named <br/> after the winged horse Pegasus in Greek mythology",
+    "Pictor" : "A small and faint constellation in the <br/> southern sky, its name is Latin for <i>painter</i>",
+    "Equuleus" : "Equuleus is Latin for little horse, a foal",
+    "Leo Minor" : "A small and faint constellation in the northern celestial <br/> hemisphere, its name is Latin for <i>the smaller lion</i>",
+    "Vulpecula" : "A faint constellation in the northern <br/> sky, its name is Latin for <i>little fox</i>",
+    "Ursa Minor" : "Also known as the Little Bear, this is a <br/> constellation in the northern sky. The brightest star in this constellation <br/> is Polaris the north star",
+    "Phoenix" : "A minor constellation in the southern sky, <br/> it is named after the mythical bird",
+    "Pisces" : "One of the constellations of the zodiac, <br/> its name is Latin plural for <i>fish</i>",
+    "Piscis Austrinus" : "A constellation in the southern celestial <br/> hemisphere, its name is Latin for <i>the southern fish</i>",
+    "Volans" : "A constellation in the southern <br/> sky, it represents a flying fish",
+    "Reticulum" : "A small faint constellation in the southern sky, <br/> its name is Latin for a small net or reticle",
+    "Sagittarius" : "One of the constellations of the zodiac, its name is Latin <br/> for <i>archer</i>. This constellation contains the galactic center",
+    "Serpens" : "A constellation of the northern hemisphere",
+    "Sextans" : "A minor equatorial constellation, its name <br/> is Latin for the <i>astronomical sextant</i>",
+    "Mensa" : "A constellation in the southern sky, <br/> its name is Latin for table",
+    "Taurus" : "One of the constellations of the zodiac, <br/> its name is Latin for <i>bull</i>",
+    "Telescopium" : "A minor southern constellation, its name <br/> is a Latinized form of the Greek word for telescope",
+    "Tucana" : "A constellation in the southern sky, <br/> its name is Latin for <i>the toucan</i>, a South American bird. ",
+    "Triangulum" : "A small constellation in the northern <br/> sky, its name is Latin for triangle",
+    "Triangulum Australe" : "A small constellation in the far southern celestial <br/> hemisphere, its name is Latin for <i>the southern triangle</i>",
+    "Aquarius" : "One of the constellations of the zodiac, <br/> its name is Latin for <i>water-carrier</i>",
+    "Scutum" : "A small constellation introduced in the seventeenth <br/> century, its name is Latin for <i>shield</i>",
+    "Carina" : "A constellation in the southern sky, its name <br/> is Latin for the keel of a ship",
+    "Centaurus" : "A bright constellation in the southern sky, its name, <br/> in Greek mythology, represents a centaur, a creature that is half man, half horse",
+    "Dorado" : "A constellation in the southern sky, <br/> its name refers to the <i>dolphinfish</i>",
+    "Eridanus" : "A constellation that is represented by a river",
+    "Lynx" : "A constellation in the northern sky, <br/> it is named after the <i>lynx</i>",
+    "Puppis" : "A constellation in the southern sky, <br/> its name is Latin for the poop deck of a ship",
+    "Vela" : "A constellation in the southern sky, <br/> its name is Latin for the sails of a ship",
+    "Camelopardalis" : "A large but faint constellation in the northern sky",
+};
+
+
+//splash screen 
+var idTimeout = 0;
+var elOpac = 1;
+function fadeout(ele)
+{
+    var elFo = document.getElementById(ele);
+    elFo.style.visibility = 'visible';
+    elFo.style.opacity = elOpac;
+    elFo.style.MozOpacity = elOpac;
+    elFo.style.filter = 'alpha(opacity=' + elOpac*100 + ')';
+    elOpac -= 0.05;
+    if (elOpac < 0)
+    {
+        elFo.style.visibility = 'hidden';
+        clearTimeout(idTimeout);
+    }
+    idTimeout = setTimeout("fadeout('fadeout')", 200);
+}
+
+
+/*
+ * Parse the /js/constellations.json file and load 
+ * the constellation and star information 
+*/
+parseJSONOnLoad = function ()
+{
+    parsedJSON = JSON.parse(this.responseText);
+	init();
+};
+
+function load_constellations()
+{
+   	constellationXHR.open("GET", "./js/constellations.json", true);
+
+	constellationXHR.onload = parseJSONOnLoad;
+
+    constellationXHR.send();
+}
+
+load_constellations();
+
+
+function particleRender(context) 
+{
+    // we get passed a reference to the canvas context
+	context.beginPath();
+	// and we just have to draw our shape at 0,0 - in this
+	// case an arc from 0 to 2Pi radians or 360º - a full circle!
+	context.arc( 0, 0, 1, 0, Math.PI * 2, true );
+	context.fill();
+}
+
+
+/*
+ * Get x,y,z positions given the azimuth, inclination and radius 
+*/
+function get_pos(azimuth, inclination, radius)
+{
+	var azi_rads = azimuth / 360 * Math.PI * 2;
+	var inc_rads = inclination / 360 * Math.PI * 2;
+
+	var x_pos = radius * Math.sin(azi_rads) * Math.cos(inc_rads);
+    var y_pos = radius * Math.sin(inc_rads);
+    var z_pos = -1 * radius * Math.cos(azi_rads) * Math.cos(inc_rads);
+
+    return {
+        'x': x_pos,
+        'y': y_pos,
+        'z': z_pos,
+    };
+}
+
+
+/*
+ * Draw lines between two points, basically to connect up the stars for each constellation 
+*/
+function draw_line(start_pos, end_pos)
+{
+	var lineMat = new THREE.LineBasicMaterial( { color: 0xffffff, opacity: 1, linewidth: 1 } );
+	var geom = new THREE.Geometry();
+	geom.vertices.push( new THREE.Vertex( new THREE.Vector3(start_pos.x, start_pos.y, start_pos.z) ) );
+	geom.vertices.push( new THREE.Vertex( new THREE.Vector3(end_pos.x, end_pos.y, end_pos.z) ) );
+
+    line = new THREE.Line(geom, lineMat);
+
+    scene.add(line);
+}
+
+
+/*
+ * Draw a star at a given position 
+*/
+function draw_star(star_colour, pos, const_name)
+{
+   	//Draw star
+   	pMaterial = new THREE.ParticleCanvasMaterial( { color: star_colour, program: particleRender } );
+	pMaterial.opacity = 0.7;
+
+   	particle = new THREE.Particle(pMaterial);
+
+    particle.ID = "blah";
+    particle.position.x = pos.x;
+    particle.position.y = pos.y;
+    particle.position.z = pos.z;
+    particle.scale.x = particle.scale.y = 25;
+
+	scene.add(particle);
+
+	//Draw Selector
+   	pMaterial = new THREE.ParticleCanvasMaterial( { color: 0xffffff, program: particleRender, side:THREE.DoubleSide } );
+	pMaterial.opacity = 0.0;
+
+   	particle = new THREE.Particle(pMaterial);
+
+    particle.ID = const_name;
+    particle.position.x = pos.x;
+    particle.position.y = pos.y;
+    particle.position.z = pos.z;
+    particle.scale.x = particle.scale.y = 200;
+	selection_objects.push(particle);
+   	scene.add(particle);
+}
+
+
+/*
+ * Convert from RA to degrees 
+*/
+function convert_to_degrees(RAh)
+{
+    return RAh * 15.0;
+}
+
+
+/*
+ * Draw a constellation at the position, then connect up the stars 
+*/
+function draw_constellation(c, name)
+{
+    var i;
+    var pos_arr = [];
+
+    for (i = 0; i < c.stars.length; i++)
+    {
+    	var cur_star = c.stars[i];
+        var azi       = convert_to_degrees(cur_star.RAh);
+        var inc      = cur_star.DEd;
+        var pos = get_pos(azi * -1, inc, star_radius);
+        pos_arr.push(pos);
+    	draw_star(0x00ff00, pos, name);
+    }
+
+    for (i = 0; i < c.lines.length; i++)
+    {
+        var cur_line = c.lines[i];
+        var pos1 = pos_arr[cur_line[0]];
+        var pos2 = pos_arr[cur_line[1]];
+        draw_line(pos1, pos2);
+    }
+}
+
+
+function shuffle(o)
+{
+    for(var j, x, i = o.length; i; j = parseInt(Math.random() * i), x = o[--i], o[i] = o[j], o[j] = x);
+    return o;
+}
+
+
+function init() 
+{
+    fadeout("fadeout");
+
+    more_constellation_info_links();
+
+    camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 10000 );
+    scene = new THREE.Scene();
+
+	var my_pos = get_pos(camera_azimuth, camera_incl,  camera_radius);
+
+    camera.position.x = my_pos.x;
+	camera.position.y = my_pos.y;
+	camera.position.z = my_pos.z;
+	camera.lookAt(scene.position);
+
+    geometry = new THREE.SphereGeometry( dome_radius, 50, 50 );
+
+    //texture = THREE.ImageUtils.loadTexture('sample.jpg');
+    texture = THREE.ImageUtils.loadTexture('stars-galaxies.jpg');
+    material = new THREE.MeshBasicMaterial({map: texture, side:THREE.BackSide});
+    mesh = new THREE.Mesh( geometry, material );
+    scene.add( mesh );
+
+	for (var i = 0; i < parsedJSON.Constellations.length; i++)
+    {
+       	var c = parsedJSON.Constellations[i]
+		var info = c.Name + ':' + parseInt(c.RAh) + ':' + parseInt(c.DEd);
+       	const_array.push(i);
+       	draw_constellation(c, info);
+    }
+    shuffle(const_array);
+
+	projector = new THREE.Projector();
+    renderer = new THREE.CanvasRenderer();
+    renderer.setClearColorHex( 0x000000, 1 );
+    renderer.setSize( window.innerWidth, window.innerHeight );
+
+	var textureImg = new Image();
+    textureImg.onload = function(){
+        animate();
+    };
+
+    textureImg.src = "sample.jpg";
+
+    document.body.appendChild( renderer.domElement );
+
+    document.addEventListener( 'mousedown', onDocumentMouseDown, false );
+
+	document.addEventListener( 'keydown', onDocumentKeyDown, false );
+
+    document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+
+    document.addEventListener( 'keyup', onDocumentKeyUp, false );
+}
+
+
+function onDocumentMouseDown( event ) 
+{
+    event.preventDefault();
+
+	var vector = new THREE.Vector3( ( event.clientX / window.innerWidth ) * 2 - 1, - ( event.clientY / window.innerHeight ) * 2 + 1, 0.5 );
+	projector.unprojectVector( vector, camera );
+
+	var raycaster = new THREE.Raycaster( camera.position, vector.sub( camera.position ).normalize() );
+
+	var intersects = raycaster.intersectObjects(selection_objects);
+
+    if ( intersects.length > 0 ) 
+    {
+		var pos = intersects[ 0 ].object;
+
+        //window.alert(pos.ID);
+        bInfoWindowIsVisible = 1;
+        fToggleInfoWindow(pos.ID);
+
+		renderer.render( scene, camera );
+	}
+    else
+    {
+        if(event.target.id != "infowindow")
+        {
+            bInfoWindowIsVisible = 0;
+            fToggleInfoWindow('');
+        }
+        else
+        {
+            event.stopPropagation();
+        }
+    }
+}
+
+
+function GetScrollDims()
+{
+    if (window.pageYoffset)
+    {
+        scrollTop = window.pageYoffset;
+    }
+    else
+    {
+        scrollTop = document.body.parentElement ? document.body.parentElement.scrollTop : 0;
+    }
+}
+
+
+function ShowFbox(elem)
+{
+    if (fboxvisible == 0)
+    {
+        GetScrollDims();
+        document.getElementById(elem).style.top = scrollTop + "px";
+        document.getElementById(elem).style.visibility = 'visible';
+        lastfbox = elem;
+        fboxvisible = 1
+    }
+}
+
+
+function HideFbox(elem)
+{
+    document.getElementById(elem).style.visibility = 'hidden';
+    fboxvisible = 0;
+    lastfbox = "";
+}
+
+
+function onDocumentKeyUp(event)
+{
+    if(!event) var event = window.event;
+    var userip = event.keyCode;
+
+    switch(userip)
+    {
+        case 112:
+        case 115: //F1, F4 
+            if ((fboxvisible == 1) && (lastfbox == "helpbox"))
+            {
+                HideFbox("helpbox");
+            }
+            else
+            {
+                ShowFbox("helpbox");
+            }
+            break;
+
+        case 119: //F8
+            if ((fboxvisible == 1) && (lastfbox == "linksbox"))
+            {
+                HideFbox("linksbox");
+            }
+            else
+            {
+                ShowFbox("linksbox");
+            }
+            break; 
+        
+        case 113:
+		case 114: //F3
+			if ((fboxvisible == 1) && (lastfbox == "gamebox"))
+			{
+				HideFbox("gamebox");
+				game_mode = 0;
+			}
+			else
+			{
+				game_mode = 1;
+				setGameInformation(const_array[game_index]);
+				ShowFbox("gamebox");
+			}
+            break;
+
+        default:
+            break;
+    }
+}
+
+
+function setGameInformation(index)
+{
+	var c = parsedJSON.Constellations[index];
+	var name = c.Name;
+	var RAh = parseInt(c.RAh);
+	var DEd = parseInt(c.DEd);
+
+	information = 'Find the constellation <span class="greenbold">' + name + '</span> <br/>(Its at RAh = ' + RAh + ' : DEd = ' + DEd + ')';
+	document.getElementById('gamebox').innerHTML = information;
+}
+
+
+function fToggleInfoWindow(information)
+{
+	var string_arr = information.split(':');
+	var information = string_arr[0];
+	var RAh = string_arr[1];
+	var DEd = string_arr[2];
+	if (game_mode == 0)
+    {
+        str_const_info = constellationInfo[information];
+
+        information = '<span class="redbold">' + information + '</span>' + '<br/>' + constellationInfo[information] + '<br/>';
+
+        //information = '<span class="redbold">' + information + '</span>' + '<br/>' + str_const_info.match(/.{1,30}/g).join('<br/>') + '<br/>';
+	}
+	else
+	{
+		var finder = parsedJSON.Constellations[const_array[game_index]].Name;
+		if (information == finder)
+		{
+			information = 'Congratulations you found <span class="greenbold">' + information + '</span>';
+			game_index++;
+			if (game_index == const_array.length)
+			{
+				information = information + '<br/> And you found them all!';
+				shuffle(const_array);
+				game_index = 0;
+			}
+			setGameInformation(const_array[game_index]);
+		}
+		else
+		{
+			information = 'Nope,that\'s <span class="redbold">' + information + '</span><br/>(You\'re at RAh ' + RAh + ' : DEd = ' + DEd + ')';
+		}
+	}
+
+	document.getElementById('infowindow').innerHTML = information;
+	if (bInfoWindowIsVisible == 0)
+	{
+		document.getElementById('infowindow').style.visibility = 'hidden';
+	}
+	else
+	{
+		document.getElementById('infowindow').style.visibility = 'visible';
+	}
+
+	document.getElementById('infowindow').style.top = mouse_y + 'px';
+	document.getElementById('infowindow').style.left = mouse_x + 'px';
+}
+
+
+function onDocumentMouseMove(event)
+{
+    ev = event || window.event;
+    mouse_x = ev.pageX;
+    mouse_y = ev.pageY;
+
+    document.getElementById('coords').innerHTML = mouse_x + ", " + mouse_y;
+}
+
+
+function onDocumentKeyDown(event)
+{
+	var code = event.keyCode;
+	var changed = false;
+
+    if (event.charCode && code == 0)
+          code = event.charCode;
+     
+    switch(code) 
+    {
+	    case 37:
+		    changed = true;
+			event.preventDefault();
+	        camera_azimuth = camera_azimuth - 0.4;
+	        break;
+	    case 38:
+	        changed = true;
+		    event.preventDefault();
+			camera_incl = camera_incl + 0.4;
+	        break;
+	    case 39:
+	        changed = true;
+		    event.preventDefault();
+			camera_azimuth = camera_azimuth + 0.4;
+	        break;
+	    case 40:
+	        changed = true;
+		    event.preventDefault();
+			camera_incl = camera_incl - 0.4;
+	        break;
+    }
+
+	if (changed)
+    {
+	    var my_pos = get_pos(camera_azimuth, camera_incl,  camera_radius);
+
+        camera.position.x = my_pos.x;
+     	camera.position.y = my_pos.y;
+     	camera.position.z = my_pos.z;
+		camera.lookAt(scene.position);
+
+        renderer.render(scene, camera);
+    }
+
+    bInfoWindowIsVisible = 0;
+    fToggleInfoWindow('');
+}
+
+
+function animate() 
+{
+    // note: three.js includes requestAnimationFrame shim
+    //requestAnimationFrame( animate );
+
+    //mesh.rotation.x += 0.01;
+    //mesh.rotation.y += 0.02;
+
+    renderer.render( scene, camera );
+    //rotate();
+
+}
+
+
+function rotate()
+{
+    camera.lookAt(scene.position);
+	var timer = new Date().getTime() * 0.0005;
+	camera.position.x = Math.floor(Math.cos( timer ) * 200);
+	camera.position.z = Math.floor(Math.sin( timer ) * 200);
+
+	renderer.render(scene, camera);
+}
+
+
+function more_constellation_info_links()
+{
+    constellation_list.sort();
+    //http://en.wikipedia.org/wiki/Andromeda_(constellation)
+    str_links = "Links<br/><hr/>";
+    for(var i=0; i < constellation_list.length; ++i)
+    {
+        str_links += '<br/><a target="_blank" href="http://en.wikipedia.org/wiki/' + constellation_list[i].split(' ').join('_') + '_(constellation)">' + constellation_list[i] + '</a>';
+    }
+    document.getElementById('linksbox').innerHTML = str_links;
+}
+
+
+</script>
+
+</head>
+
+<body>
+
+<!--<div id="coords"></div>-->
+<div id="infowindow" class="infowindow"></div>
+
+<div class="fbox" id="helpbox">
+    <b>Constellation Explorer : Help</b><hr/>
+
+    Constellation Explorer is an educational game written in HTML5 and Javascript! 
+    <br/><br/>
+    This game features a sky-dome implemented in Canvas in which the player can 
+    <br/>
+    navigate across a collection of constellations, and with a simple left-click 
+    <br/>
+    on a star, learn about important constellations in the night sky. 
+    <br/>
+    Pressing F3 invokes 'game-mode' in which the player must find a given  
+    <br/>
+    constellation in the sky - the constellation's RA and Dec are provided as a hint.
+
+    <br/>
+    <br/>
+    Constellation Explorer was written by Abhishek Tiwary and Joseph Belbin for 
+    <br/>
+    Udacity's HTML5 Game Development class. 
+
+    <br/>
+    <br/>
+    <br/>
+    <br/>
+    Joseph Belbin, Abhishek Tiwary 2013 
+
+    <br/>
+    <br/>
+    <br/>
+    <br/>
+    <p align="left" class="close" onclick="HideFbox('helpbox')">CLOSE</p>
+</div>
+
+
+<div class="fbox2" id="linksbox">
+    <b>Links</b> <br/>
+    <br/>
+
+    <br/><br/>
+    <p align="left" class="close" onclick="HideFbox('searchbox')">CLOSE</p>
+</div>
+
+
+<div class="gamebox" id="gamebox">
+    <b>Blah</b> <br/>
+    <br/>
+
+    <br/><br/>
+    <p align="left" class="close" onclick="HideFbox('gamebox')">CLOSE</p>
+</div>
+
+
+<div id="fadeout" class="fadeout">
+    <p>Welcome to <br/><h1>Constellation Explorer </h1> an astronomy game written in HTML5!</p>
+    <br/>
+    <p style="font-size: 10px;">Press F1 or F4 for help, or F2 or F3 for Game Mode, or F8 for links</p>
+</div>
+
+</body>
+
+</html>
+
