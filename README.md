@@ -7,5 +7,5 @@ Checkout from the repository and run index.html on any HTML5 capable browser. Th
 
 Our group consists of: 
 Joe Belbin: joseph.belbin@gmail.com 
-Ab Tiwary: ab.tiwary@gmail.com
+Ab Tiwary: pi.meson.hadron@gmail.com
 
